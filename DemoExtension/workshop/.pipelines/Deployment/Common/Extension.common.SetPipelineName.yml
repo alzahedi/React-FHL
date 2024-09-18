@@ -1,0 +1,54 @@
+# File: Extension.common.SetPipelineName.yml
+# Version: 2.0.0
+# Change Log:
+# - 1.0.0 (5/14/24): Initial template
+# - 2.0.0 (7/3/24): Adding USNat and USSec support
+
+# Sets the pipeline display name using some of the parameters of the release
+# This file should be imported into a parent deployment YAML. Do not use stand-alone
+# Using templates from https://onebranch.visualstudio.com/OneBranch.Pipelines/_git/GovernedTemplates?path=/v2/Steps/Release.Steps.yml&_a=contents&version=GBmaster
+parameters:
+- name: DeployToDF
+  type: boolean
+  default: false
+- name: DeployToStagePreview
+  type: boolean
+  default: false
+- name: DeployToProd
+  type: boolean
+  default: false
+- name: DeployToFF
+  type: boolean
+  default: false
+- name: DeployToMC
+  type: boolean
+  default: false
+- name: DeployToUSNat
+  type: boolean
+  default: false
+- name: DeployToUSSec
+  type: boolean
+  default: false
+- name: Action
+  type: string
+  default: ''
+- name: ob_release_environment # Must be one of the Ev2 recognised environment names [Test|Production|Fairfax|Mooncake|USSec|USNat] etc
+  default: ''
+stages:
+- stage: "Test_set_pipeline_name" # OneBranch only allows stage names with [A-Za-z0-9_]+
+  displayName: 'Set pipeline name'
+  dependsOn: [] # Explicitly depend on no other stages
+  variables:
+  - name: ob_release_environment
+    value: ${{ parameters.ob_release_environment }}
+  jobs:
+  - job: Set_pipeline_name
+    pool:
+      type: release
+    steps:
+      - task: onebranch.pipeline.version@1
+        inputs:
+          system: 'Custom'
+          exclude_commit: true
+          # TO DO: You may have to update resources.pipeline name as needed
+          customVersion: "$(resources.pipeline._OfficialBuild.runName)-${{ parameters.Action }}DF ${{ parameters.DeployToDF }}-${{ parameters.Action }}StagePreview ${{ parameters.DeployToStagePreview }}-${{ parameters.Action }}Prod ${{ parameters.DeployToProd }}-${{ parameters.Action }}FF ${{ parameters.DeployToFF }}-${{ parameters.Action }}MC ${{ parameters.DeployToMC }}-${{ parameters.Action }}USNat ${{ parameters.DeployToUSNat }}-${{ parameters.Action }}USSec ${{ parameters.DeployToUSSec }}-$(Build.BuildId)"

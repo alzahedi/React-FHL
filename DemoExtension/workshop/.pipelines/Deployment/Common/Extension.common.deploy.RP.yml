@@ -1,0 +1,85 @@
+# File: Extension.common.deploy.RP.yml
+# Version: 2.0.0
+# Change Log:
+# - 1.0.0 (5/14/24): Initial template
+# - 2.0.0 (7/3/24):
+  # - Removing the Bake stage and BakeTime parameter as the bake is included in the RP rolloutspec.
+  # - Adding USNat/USSec support
+
+# Deploys the extension to a single region
+# This file should be imported into a parent deployment YAML. Do not use stand-alone
+# Using templates from https://onebranch.visualstudio.com/OneBranch.Pipelines/_git/GovernedTemplates?path=/v2/Steps/Release.Steps.yml&_a=contents&version=GBmaster
+parameters:
+- name: SingleStageDependsOn # List of other stages this template will depend on. If there should be no dependencies, pass in an empty array []
+  type: object
+  default: ''
+- name: EnvironmentName  # This should match the environment name used in the EnvironmentDefinitions.*.json (e.g. dogfood-fx, mpac, mc, etc.)
+  type: string
+  default: ''
+- name: EnvironmentType  # This should match the environment type used in the EnvironmentDefinitions.*.json (e.g. dogfood, prod, mc, etc.)
+  default: ''
+- name: ob_release_environment # Must be one of the Ev2 recognised environment names [Test|Production|Fairfax|Mooncake|USSec|USNat] etc
+  type: string
+  default: ''
+- name: Ev2ServicePrincipal
+  default: a83c30a6-27af-4022-84e3-99f423acea64 # Only used for dogfood deployments.
+- name: BuildArtifactPattern
+  type: string
+- name: ServiceRootPath
+  type: string
+- name: Action
+  type: string
+  default: 'Staging'
+- name: RolloutSpecFileName
+  type: string
+  default: ''
+stages:
+- stage:  ${{ replace(parameters.EnvironmentType, 'dogfood', 'Test') }}_RP_${{ parameters.EnvironmentName }}_${{ parameters.Action }} # OneBranch only allows stage names with [A-Za-z0-9_]+
+  displayName: '${{  parameters.EnvironmentType }} RP: ${{ parameters.EnvironmentName }} ${{ parameters.Action }}'
+  dependsOn: ${{ parameters.SingleStageDependsOn }}
+  variables:
+  - name: BuildArtifactPattern
+    value: ${{ parameters.BuildArtifactPattern }} # example: retail-amd64/src/SDK/Extensions/PlaygroundHostingSvcOutput
+  - name: ServiceRootPath
+    value: ${{ parameters.ServiceRootPath }} # example: $(Pipeline.Workspace)/_OfficialBuild/drop_build_retail_amd64/$(BuildArtifactPattern)
+  - name: ob_release_environment
+    value: ${{ parameters.ob_release_environment }}
+  - ${{ if or(eq(parameters.ob_release_environment, 'USNat'), eq(parameters.ob_release_environment, 'USSec')) }}:
+    - name: ob_release_stagetype
+      value: deployment
+    # TO DO: You may have to configure the 'CvrpManifestRelativePath' and the 'ArtifactToDeploy'.
+    # See https://eng.ms/docs/cloud-ai-platform/azure-edge-platform-aep/aep-engineering-systems/productivity-and-experiences/ce-legacy-infrastructure/onebranch/release/yamlreleasepipelines/releasetoair-gappedclouds for more details.
+    - name: CvrpManifestRelativePath
+      value: \build.manifest
+    - name: ArtifactToDeploy
+      value: drop_build_main
+  jobs:
+  - job: staging
+    pool:
+      type: release
+    steps:
+    # TO DO: You may have update the artifact download location and artifact name if needed
+    - download: _OfficialBuild
+      artifact: drop_build_retail_amd64
+      patterns: $(BuildArtifactPattern)/**
+    - task: vsrm-ev2.vss-services-ev2.adm-release-task.ExpressV2Internal@1
+      displayName: 'Ev2: ${{ parameters.ob_release_environment }} ${{ parameters.Action }}'
+      inputs:
+        ${{ if or(eq(parameters.ob_release_environment, 'USNat'), eq(parameters.ob_release_environment, 'USSec')) }}:
+          UseServerMonitorTask: false
+        ${{ if not(or(eq(parameters.ob_release_environment, 'USNat'), eq(parameters.ob_release_environment, 'USSec'))) }}:
+          UseServerMonitorTask: true
+        EnableStrictValidation: false
+        ValidateOnly: false
+        ServiceRootLocation: LinkedArtifact
+        RolloutSpecType: RSPath
+        ServiceRootPath: $(ServiceRootPath)
+        RolloutSpecPath: '$(ServiceRootPath)/${{  parameters.ob_release_environment }}/Slots/RolloutSpec.SetSlot.BuildArtifact.${{ parameters.RolloutSpecFileName }}.json'
+        ${{ if eq(parameters.ob_release_environment, 'Test') }}:
+          EndpointProviderType: Ev2Endpoint
+          ConnectedServiceName: ${{ parameters.Ev2ServicePrincipal }}
+        ${{ else }}:
+          EndpointProviderType: ApprovalService
+          ApprovalServiceEnvironment: ${{ parameters.ob_release_environment }}
+        timeoutInMinutes: 1440
+        retryCountOnTaskFailure: 3
