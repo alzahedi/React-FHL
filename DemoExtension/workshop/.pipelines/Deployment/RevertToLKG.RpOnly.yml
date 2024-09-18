@@ -1,0 +1,174 @@
+# File: RevertToLKG.RpOnly.yml
+# Version: 2.0.0
+# Change Log:
+# - 1.0.0 (5/14/24): Initial template
+# - 2.0.0 (7/3/24):
+  # - Removing the  "RevertStagePreview" parameter and "Revert MPAC RP" stage as it is already included in the RP Prod rollout.
+  # - Adding USNat and USSec support
+
+# Reverts the Extension to LKG to MPAC, Production, MC and FF environments; RP Only
+# This is a top-level YAML pipeline. It can be run directly.
+# Using templates from https://onebranch.visualstudio.com/OneBranch.Pipelines/_git/GovernedTemplates?path=/v2/Steps/Release.Steps.yml&_a=contents&version=GBmaster
+trigger: none # NOTE: Triggers are set on pipeline completion, under resources.pipelines below
+parameters:
+- name: RevertProd
+  displayName: RevertProd - Revert Prod
+  type: boolean
+  default: true
+- name: RevertFF
+  displayName: RevertFF - Revert Fairfax
+  type: boolean
+  default: true
+- name: RevertMC
+  displayName: RevertMC - Revert Mooncake
+  type: boolean
+  default: true
+- name: RevertUSNat
+  displayName: RevertUSNat - Revert USNat
+  type: boolean
+  default: true
+- name: RevertUSSec
+  displayName: RevertUSSec - Revert USSec
+  type: boolean
+  default: true
+- name: BuildArtifactPattern
+  displayName: BuildArtifactPattern - The pattern for the build artifact.
+  type: string
+  default: bin/Deployment
+- name: ServiceRootPath
+  displayName: ServiceRootPath - The root path for deployment files.
+  type: string
+  default: $(Pipeline.Workspace)/_OfficialBuild/drop_build_retail_amd64/$(BuildArtifactPattern)
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: OneBranch.Pipelines/GovernedTemplates
+    ref: refs/heads/main
+  pipelines:
+  # Reference https://learn.microsoft.com/en-us/azure/devops/pipelines/yaml-schema/resources-pipelines-pipeline?view=azure-pipelines#properties for more information.
+  # TO DO: Add Pipeline name
+  - pipeline: # example: _OfficialBuild
+  # TO DO: Add Pipeline source
+    source: # example: AzureUX-PortalFx-Official
+  # TO DO: Add Pipeline project
+    project:  # example: One
+extends:
+  template: v2/OneBranch.Official.CrossPlat.yml@templates
+  parameters:
+    stages:
+    # Set Pipeline Name
+    - template: Common/Extension.common.SetPipelineName.yml
+      parameters:
+        DeployToStagePreview: true # true as it is included in the "Deploy to Prod RP" rollout
+        DeployToProd: ${{ parameters.RevertProd }}
+        DeployToFF: ${{ parameters.RevertFF }}
+        DeployToMC: ${{ parameters.RevertMC }}
+        DeployToUSNat: ${{ parameters.RevertUSNat }}
+        DeployToUSSec: ${{ parameters.RevertUSSec }}
+        Action: 'RevertLKG'
+        ob_release_environment: 'Test'
+    #Revert Prod RP
+    - ${{ if parameters.RevertProd }}:
+      - template: Common/Extension.common.deploy.RP.yml
+        parameters:
+          SingleStageDependsOn: 'Test_set_pipeline_name'
+          EnvironmentName: 'prod'
+          EnvironmentType: Prod
+          ob_release_environment: 'Production'
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+          RolloutSpecFileName: 'lastknowngoodbuild'
+          Action: 'RevertLKG'
+    #Revert FF RP
+    - ${{ if parameters.RevertFF }}:
+      - template: Common/Extension.common.deploy.RP.yml
+        parameters:
+          ${{ if parameters.RevertProd }}:
+            SingleStageDependsOn:
+              - 'Prod_RP_prod_RevertLKG'
+          ${{ else }}:
+            SingleStageDependsOn: 'Test_set_pipeline_name'
+          EnvironmentName: 'ff'
+          EnvironmentType: FF
+          ob_release_environment: 'Fairfax'
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+          RolloutSpecFileName: 'lastknowngoodbuild'
+          Action: 'RevertLKG'
+    #Revert MC RP
+    - ${{ if parameters.RevertMC }}:
+      - template: Common/Extension.common.deploy.RP.yml
+        parameters:
+          ${{ if parameters.RevertProd }}:
+            SingleStageDependsOn:
+              - 'Prod_RP_prod_RevertLKG'
+          ${{ else }}:
+            SingleStageDependsOn: 'Test_set_pipeline_name'
+          EnvironmentName: 'mc'
+          EnvironmentType: MC
+          ob_release_environment: 'Mooncake'
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+          RolloutSpecFileName: 'lastknowngoodbuild'
+          Action: 'RevertLKG'
+    #Revert USNat RP
+    - ${{ if parameters.RevertUSNat }}:
+      - template: Common/Extension.common.deploy.RP.yml
+        parameters:
+          ${{ if parameters.RevertMC }}:
+            ${{ if parameters.RevertFF }}:
+              SingleStageDependsOn:
+                - 'MC_RP_mc_RevertLKG'
+                - 'FF_RP_ff_RevertLKG'
+            ${{ else }}:
+              SingleStageDependsOn:
+                - 'MC_RP_mc_RevertLKG'
+          ${{ else }}:
+            ${{ if parameters.RevertFF }}:
+              SingleStageDependsOn:
+                - 'FF_RP_ff_RevertLKG'
+            ${{ else }}:
+              ${{ if parameters.RevertProd }}:
+                SingleStageDependsOn:
+                  - 'Prod_RP_prod_RevertLKG'
+              ${{ else }}:
+                SingleStageDependsOn:
+                  - 'Test_set_pipeline_name'
+          EnvironmentName: 'USNat'
+          EnvironmentType: USNat
+          ob_release_environment: 'USNat'
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+          RolloutSpecFileName: 'lastknowngoodbuild'
+          Action: 'RevertLKG'
+    #Revert USSec RP
+    - ${{ if parameters.RevertUSSec }}:
+      - template: Common/Extension.common.deploy.RP.yml
+        parameters:
+          ${{ if parameters.RevertMC }}:
+            ${{ if parameters.RevertFF }}:
+              SingleStageDependsOn:
+                - 'MC_RP_mc_RevertLKG'
+                - 'FF_RP_ff_RevertLKG'
+            ${{ else }}:
+              SingleStageDependsOn:
+                - 'MC_RP_mc_RevertLKG'
+          ${{ else }}:
+            ${{ if parameters.RevertFF }}:
+              SingleStageDependsOn:
+                - 'FF_RP_ff_RevertLKG'
+            ${{ else }}:
+              ${{ if parameters.RevertProd }}:
+                SingleStageDependsOn:
+                  - 'Prod_RP_prod_RevertLKG'
+              ${{ else }}:
+                SingleStageDependsOn:
+                  - 'Test_set_pipeline_name'
+          EnvironmentName: 'USSec'
+          EnvironmentType: USSec
+          ob_release_environment: 'USSec'
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+          RolloutSpecFileName: 'lastknowngoodbuild'
+          Action: 'RevertLKG'

@@ -1,0 +1,322 @@
+# File: UnifiedRollout.RPClassicCombined.yml
+# Version: 2.0.0
+# Change Log:
+# - 1.0.0 (5/14/24): Initial template
+# - 2.0.0 (7/3/24):
+  # - Removing "Deploy to MPAC RP" stage as it is already included in the RP Prod rollout.
+  # - Removing BakeTime in RP stages as the bake is included in the RP rolloutspec.
+  # - Adding USNat and USSec support
+
+# Deploys the Extension to DF, MPAC, Production, MC and FF environments; RP and Classic Combined
+# This is a top-level YAML pipeline. It can be run directly.
+# Using templates from https://onebranch.visualstudio.com/OneBranch.Pipelines/_git/GovernedTemplates?path=/v2/Steps/Release.Steps.yml&_a=contents&version=GBmaster
+trigger: none # NOTE: Triggers are set on pipeline completion, under resources.pipelines below
+parameters:
+- name: DeployToDF
+  displayName: DeployToDF - Deploy to Dogfood (Classic only)
+  type: boolean
+  default: true
+- name: DeployToStagePreview
+  displayName: DeployToStagePreview - Deploy to Stage Preview (RC and MPAC) (Classic only)
+  type: boolean
+  default: true
+- name: DeployToProd
+  displayName: DeployToProd - Deploy to Prod
+  type: boolean
+  default: true
+- name: DeployToFF
+  displayName: DeployToFF - Deploy to Fairfax
+  type: boolean
+  default: true
+- name: DeployToMC
+  displayName: DeployToMC - Deploy to Mooncake
+  type: boolean
+  default: true
+- name: DeployToUSNat
+  displayName: DeployToUSNat - Deploy to USNat
+  type: boolean
+  default: true
+- name: DeployToUSSec
+  displayName: DeployToUSSec - Deploy to USSec
+  type: boolean
+  default: true
+- name: BakeTime
+  displayName: Bake Time for Deployments, set according to https://aka.ms/sdpwiki (Classic only)
+  type: number
+  default: 1440
+- name: BuildArtifactPattern
+  displayName: BuildArtifactPattern - The pattern for the build artifact.
+  type: string
+  default: bin/Deployment
+- name: ServiceRootPath
+  displayName: ServiceRootPath - The root path for deployment files.
+  type: string
+  default: $(Pipeline.Workspace)/_OfficialBuild/drop_build_retail_amd64/$(BuildArtifactPattern)
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: OneBranch.Pipelines/GovernedTemplates
+    ref: refs/heads/main
+  pipelines:
+  # Reference https://learn.microsoft.com/en-us/azure/devops/pipelines/yaml-schema/resources-pipelines-pipeline?view=azure-pipelines#properties for more information.
+  # TO DO: Add Pipeline name
+  - pipeline: # example: _OfficialBuild
+  # TO DO: Add Pipeline source
+    source: # example: AzureUX-PortalFx-Official
+  # TO DO: Add Pipeline project
+    project:  # example: One
+extends:
+  template: v2/OneBranch.Official.CrossPlat.yml@templates
+  parameters:
+    stages:
+    # Set Pipeline Name
+    - template: Common/Extension.common.SetPipelineName.yml
+      parameters:
+        DeployToDF: ${{ parameters.DeployToDF }}
+        DeployToStagePreview: ${{ parameters.DeployToStagePreview }}
+        DeployToProd: ${{ parameters.DeployToProd }}
+        DeployToFF: ${{ parameters.DeployToFF }}
+        DeployToMC: ${{ parameters.DeployToMC }}
+        Action: 'DeployTo'
+        ob_release_environment: 'Test'
+    # Deploy to DF
+    - ${{ if parameters.DeployToDF }}:
+      - template: Common/Extension.common.deploy.yml
+        parameters:
+          SingleStageDependsOn: 'Test_set_pipeline_name'
+          EnvironmentName: 'dogfood'
+          EnvironmentType: dogfood
+          ob_release_environment: 'Test'
+          BakeTimeMinutes: ${{ parameters.BakeTime }}
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+    # Deploy to MPAC
+    - ${{ if parameters.DeployToStagePreview }}:
+      - template: Common/Extension.common.deploy.yml
+        parameters:
+          ${{ if parameters.DeployToDF }}:
+            SingleStageDependsOn: 'Test_dogfood_Staging'
+          ${{ else }}:
+            SingleStageDependsOn: 'Test_set_pipeline_name'
+          EnvironmentName: 'mpac'
+          EnvironmentType: Prod
+          ob_release_environment: 'Production'
+          BakeTimeMinutes: ${{ parameters.BakeTime }}
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+    # Deploy to Prod
+    - ${{ if parameters.DeployToProd }}:
+      - template: Common/Extension.common.deploy.yml
+        parameters:
+          ${{ if parameters.DeployToStagePreview }}:
+            SingleStageDependsOn: 'Prod_mpac_Staging'
+          ${{ elseif parameters.DeployToDF }}:
+            SingleStageDependsOn: 'Test_dogfood_Staging'
+          ${{ else }}:
+            SingleStageDependsOn: 'Test_set_pipeline_name'
+          EnvironmentName: 'prod'
+          EnvironmentType: Prod
+          ob_release_environment: 'Production'
+          BakeTimeMinutes: ${{ parameters.BakeTime }}
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+    # Deploy to Prod RP
+    - ${{ if parameters.DeployToProd }}:
+      - template: Common/Extension.common.deploy.RP.yml
+        parameters:
+          SingleStageDependsOn: 'Test_set_pipeline_name'
+          EnvironmentName: 'prod'
+          EnvironmentType: Prod
+          ob_release_environment: 'Production'
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+          RolloutSpecFileName: 'All.P1D'
+    # Deploy to FF
+    - ${{ if parameters.DeployToFF }}:
+      - template: Common/Extension.common.deploy.yml
+        parameters:
+          ${{ if parameters.DeployToProd }}:
+            SingleStageDependsOn:
+              - 'Prod_prod_Staging'
+          ${{ elseif parameters.DeployToStagePreview }}:
+            SingleStageDependsOn:
+              - 'Prod_mpac_Staging'
+          ${{ elseif parameters.DeployToDF }}:
+            SingleStageDependsOn:
+              - 'Test_dogfood_Staging'
+          ${{ else }}:
+            SingleStageDependsOn: 'Test_set_pipeline_name'
+          EnvironmentName: 'ff'
+          EnvironmentType: FF
+          ob_release_environment: 'Fairfax'
+          BakeTimeMinutes: ${{ parameters.BakeTime }}
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+    # Deploy to FF RP
+    - ${{ if parameters.DeployToFF }}:
+      - template: Common/Extension.common.deploy.RP.yml
+        parameters:
+          ${{ if parameters.DeployToProd }}:
+            SingleStageDependsOn:
+              - 'Prod_RP_prod_Staging'
+          ${{ else }}:
+            SingleStageDependsOn: 'Test_set_pipeline_name'
+          EnvironmentName: 'ff'
+          EnvironmentType: FF
+          ob_release_environment: 'Fairfax'
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+          RolloutSpecFileName: 'All.P1D'
+    # Deploy to MC
+    - ${{ if parameters.DeployToMC }}:
+      - template: Common/Extension.common.deploy.yml
+        parameters:
+          ${{ if parameters.DeployToProd }}:
+            SingleStageDependsOn:
+              - 'Prod_prod_Staging'
+          ${{ elseif parameters.DeployToStagePreview }}:
+            SingleStageDependsOn:
+              - 'Prod_mpac_Staging'
+          ${{ elseif parameters.DeployToDF }}:
+            SingleStageDependsOn:
+              - 'Test_dogfood_Staging'
+          ${{ else }}:
+            SingleStageDependsOn: 'Test_set_pipeline_name'
+          EnvironmentName: 'mc'
+          EnvironmentType: MC
+          ob_release_environment: 'Mooncake'
+          BakeTimeMinutes: ${{ parameters.BakeTime }}
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+    # Deploy to MC RP
+    - ${{ if parameters.DeployToMC }}:
+      - template: Common/Extension.common.deploy.RP.yml
+        parameters:
+          ${{ if parameters.DeployToProd }}:
+            SingleStageDependsOn:
+              - 'Prod_RP_prod_Staging'
+          ${{ else }}:
+            SingleStageDependsOn: 'Test_set_pipeline_name'
+          EnvironmentName: 'mc'
+          EnvironmentType: MC
+          ob_release_environment: 'Mooncake'
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+          RolloutSpecFileName: 'All.P1D'
+    # Deploy to USNat
+    - ${{ if parameters.DeployToUSNat }}:
+      - template: Common/Extension.common.deploy.yml
+        parameters:
+          ${{ if parameters.DeployToMC }}:
+            ${{ if parameters.DeployToFF }}:
+              SingleStageDependsOn:
+                - 'MC_mc_Staging'
+                - 'FF_ff_Staging'
+            ${{ else }}:
+              SingleStageDependsOn:
+                - 'MC_mc_Staging'
+          ${{ else }}:
+            ${{ if parameters.DeployToFF }}:
+              SingleStageDependsOn:
+                - 'FF_ff_Staging'
+            ${{ else }}:
+              ${{ if parameters.DeployToProd }}:
+                SingleStageDependsOn:
+                  - 'Prod_prod_Staging'
+              ${{ else }}:
+                SingleStageDependsOn:
+                  - 'Test_set_pipeline_name'
+          EnvironmentName: 'USNat'
+          EnvironmentType: USNat
+          ob_release_environment: 'USNat'
+          BakeTimeMinutes: ${{ parameters.BakeTime }}
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+    # Deploy to USNat RP
+    - ${{ if parameters.DeployToUSNat }}:
+      - template: Common/Extension.common.deploy.RP.yml
+        parameters:
+          ${{ if parameters.DeployToMC }}:
+            ${{ if parameters.DeployToFF }}:
+              SingleStageDependsOn:
+                - 'MC_RP_mc_Staging'
+                - 'FF_RP_ff_Staging'
+            ${{ else }}:
+              SingleStageDependsOn:
+                - 'MC_RP_mc_Staging'
+          ${{ else }}:
+            ${{ if parameters.DeployToFF }}:
+              SingleStageDependsOn:
+                - 'FF_RP_ff_Staging'
+            ${{ else }}:
+              ${{ if parameters.DeployToProd }}:
+                SingleStageDependsOn:
+                  - 'Prod_RP_prod_Staging'
+              ${{ else }}:
+                SingleStageDependsOn:
+                  - 'Test_set_pipeline_name'
+          EnvironmentName: 'USNat'
+          EnvironmentType: USNat
+          ob_release_environment: 'USNat'
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+          RolloutSpecFileName: 'All.P1D'
+    # Deploy to USSec
+    - ${{ if parameters.DeployToUSSec }}:
+      - template: Common/Extension.common.deploy.yml
+        parameters:
+          ${{ if parameters.DeployToMC }}:
+            ${{ if parameters.DeployToFF }}:
+              SingleStageDependsOn:
+                - 'MC_mc_Staging'
+                - 'FF_ff_Staging'
+            ${{ else }}:
+              SingleStageDependsOn:
+                - 'MC_mc_Staging'
+          ${{ else }}:
+            ${{ if parameters.DeployToFF }}:
+              SingleStageDependsOn:
+                - 'FF_ff_Staging'
+            ${{ else }}:
+              ${{ if parameters.DeployToProd }}:
+                SingleStageDependsOn:
+                  - 'Prod_prod_Staging'
+              ${{ else }}:
+                SingleStageDependsOn:
+                  - 'Test_set_pipeline_name'
+          EnvironmentName: 'USSec'
+          EnvironmentType: USSec
+          ob_release_environment: 'USSec'
+          BakeTimeMinutes: ${{ parameters.BakeTime }}
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+    # Deploy to USSec RP
+    - ${{ if parameters.DeployToUSSec }}:
+      - template: Common/Extension.common.deploy.RP.yml
+        parameters:
+          ${{ if parameters.DeployToMC }}:
+            ${{ if parameters.DeployToFF }}:
+              SingleStageDependsOn:
+                - 'MC_RP_mc_Staging'
+                - 'FF_RP_ff_Staging'
+            ${{ else }}:
+              SingleStageDependsOn:
+                - 'MC_RP_mc_Staging'
+          ${{ else }}:
+            ${{ if parameters.DeployToFF }}:
+              SingleStageDependsOn:
+                - 'FF_RP_ff_Staging'
+            ${{ else }}:
+              ${{ if parameters.DeployToProd }}:
+                SingleStageDependsOn:
+                  - 'Prod_RP_prod_Staging'
+              ${{ else }}:
+                SingleStageDependsOn:
+                  - 'Test_set_pipeline_name'
+          EnvironmentName: 'USSec'
+          EnvironmentType: USSec
+          ob_release_environment: 'USSec'
+          BuildArtifactPattern: ${{ parameters.BuildArtifactPattern }}
+          ServiceRootPath: ${{ parameters.ServiceRootPath }}
+          RolloutSpecFileName: 'All.P1D'
