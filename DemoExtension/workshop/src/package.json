@@ -10,6 +10,7 @@
     "serve": "extension-serve",
     "start": "extension-start",
     "test": "jest --config ./test-config/jest.config.ts",
+    "test-update-snapshot": "jest --update-snapshot --config ./test-config/jest.config.ts",
     "test:watch": "jest --config ./test-config/jest.config.ts --watch"
   },
   "dependencies": {

@@ -21,6 +21,7 @@ const config: Config = {
         "lcov",
     ],
     moduleNameMapper: {
+        "@microsoft/azureportal-reactview/Dialog": "<rootDir>/__test__/___mocks__/Dialog.tsx",
         ...jestModuleNameMappings,
     },
     reporters: [
@@ -42,6 +43,7 @@ const config: Config = {
     ],
     testPathIgnorePatterns: [
         "/node_modules/",
+        "___mocks__/"
     ],
     transform: {
         "^.+\\.tsx?$": [

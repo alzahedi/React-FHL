@@ -3,6 +3,8 @@ import * as React from "react";
 // import { HelloWorldStrings } from "./HelloWorldStrings.resjson";
 
 import { ConfidenceRating, UserInfo } from "./ConfidenceRating";
+import { Text } from "@fluentui/react";
+// import { Text } from "@fluentui/react";
 
 
 
@@ -118,6 +120,7 @@ Az.setTitle("Confidence ratings");
 
 const HelloWorld = () => {
     return <>
+        <Text>Hello World!</Text>
         <UserInfo />
         <ConfidenceRating confidenceRating={99} />
     </>

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Icon, mergeStyles } from "@fluentui/react";
 import * as Az from "@microsoft/azureportal-reactview/Az";
+import { DialogType, showDialog } from "@microsoft/azureportal-reactview/Dialog";
 
 const iconClass = mergeStyles({
    fontSize: "100px",
@@ -76,6 +77,14 @@ export const UserInfo = (): JSX.Element => {
     Az.getUserInfo().then((userInfo) => {
         setUserName(userInfo.givenName); 
         setEmailId(userInfo.email);
+    });
+
+    showDialog({
+        title: "User Info",
+        customButtonLabels: ["Take me to the page"],
+        content: `Hello ${userName}, your email ID is ${emailID}`,
+        kind: DialogType.Custom,
+
     });
 
     return (
