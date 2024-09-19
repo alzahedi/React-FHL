@@ -184,7 +184,7 @@ exports[`renders HelloWorld Component snapshot test 1`] = `
       <span
         class="css-110"
       >
-        Hello World!
+        Hello World!asdadsdda
       </span>
       <div>
         <div>
@@ -220,7 +220,7 @@ exports[`renders HelloWorld Component snapshot test 1`] = `
         <i
           aria-hidden="true"
           class="root-111"
-          data-icon-name="FavoriteStarFill"
+          data-icon-name="FavoriteStar"
         />
       </div>
     </div>
@@ -229,7 +229,7 @@ exports[`renders HelloWorld Component snapshot test 1`] = `
     <span
       class="css-110"
     >
-      Hello World!
+      Hello World!asdadsdda
     </span>
     <div>
       <div>
@@ -265,7 +265,7 @@ exports[`renders HelloWorld Component snapshot test 1`] = `
       <i
         aria-hidden="true"
         class="root-111"
-        data-icon-name="FavoriteStarFill"
+        data-icon-name="FavoriteStar"
       />
     </div>
   </div>,

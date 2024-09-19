@@ -120,12 +120,12 @@ Az.setTitle("Confidence ratings");
 
 const HelloWorld = () => {
     return <>
-        <Text>Hello World!</Text>
+        <Text>Hello World!asdadsdda</Text>
         <UserInfo />
-        <ConfidenceRating confidenceRating={99} />
+        <ConfidenceRating confidenceRating={62} />
     </>
     
 };
-
+    
 export default HelloWorld;
 

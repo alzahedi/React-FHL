@@ -12,3 +12,6 @@ describe("getStarRating Utility methods", () => {
         expect(getStarRating(input)).toBe(expected);
     });
 });
+
+
+// TODO: Add more tests for getStarRating to achieve full coverage
