@@ -1,10 +1,14 @@
 import * as Az from "@microsoft/azureportal-reactview/Az";
 import * as React from "react";
-import { Text } from "@fluentui/react/lib/Text";
-import { HelloWorldStrings } from "./HelloWorldStrings.resjson";
+// import { HelloWorldStrings } from "./HelloWorldStrings.resjson";
+
+import { ConfidenceRating, UserInfo } from "./ConfidenceRating";
+
+
 
 //V1 - Hello World Boiler plate discusssion.
 
+/*
 Az.setTitle(HelloWorldStrings.HelloWorldTitle);
 
 const HelloWorld = () => {
@@ -12,7 +16,7 @@ const HelloWorld = () => {
 };
 
 export default HelloWorld;
-
+*/
 
 
 /*
@@ -110,8 +114,15 @@ export default HelloWorld;
 */
 
 
+Az.setTitle("Confidence ratings");
 
+const HelloWorld = () => {
+    return <>
+        <UserInfo />
+        <ConfidenceRating confidenceRating={99} />
+    </>
+    
+};
 
-
-
+export default HelloWorld;
 
